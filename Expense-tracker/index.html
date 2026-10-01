@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edge AI Inventory Scanner</title>
+
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #e8e8e8;
+            color: #333;
+            min-height: 100vh;
+        }
+
+        /* Header */
+        .header {
+            background: #fff;
+            border-bottom: 1px solid #ddd;
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .header-left h1 {
+            font-size: 20px;
+            color: #222;
+            font-weight: 600;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #2196f3, #1976d2);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 8px rgba(33, 150, 243, 0.3);
+        }
+
+        .logo svg {
+            width: 24px;
+            height: 24px;
+            fill: white;
+        }
+
+        .app-name {
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        /* Main Layout */
+        .main-container {
+            display: flex;
+            height: calc(100vh - 71px);
+            padding-top: 15px;
+            /* Menurunkan layout ke bawah */
+        }
+
+        /* Sidebar Kiri */
+        .sidebar {
+            width: 260px;
+            background: #fff;
+            border-right: 1px solid #ddd;
+            padding: 20px;
+            overflow-y: auto;
+            margin-top: 10px;
+            /* Menurunkan sidebar */
+            border-radius: 8px;
+            margin-left: 10px;
+            height: calc(100% - 20px);
+        }
+
+        .sidebar h3 {
+            font-size: 13px;
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 12px;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+        }
+
+        .sidebar button {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 10px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            color: white;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .sidebar button:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        .sidebar button:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        .sidebar button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .btn-start {
+            background: #4caf50;
+        }
+
+        .btn-stop {
+            background: #f44336;
+        }
+
+        .btn-ai {
+            background: #2196f3;
+        }
+
+        .btn-export {
+            background: #ff9800;
+        }
+
+        .counter-box {
+            margin-top: 25px;
+            padding: 15px;
+            background: linear-gradient(135deg, #2196f3, #1976d2);
+            border-radius: 6px;
+            text-align: center;
+            color: white;
+            box-shadow: 0 2px 8px rgba(33, 150, 243, 0.3);
+        }
+
+        .counter-box h3 {
+            margin-bottom: 10px;
+            color: white;
+            font-size: 13px;
+        }
+
+        .counter-value {
+            font-size: 42px;
+            font-weight: bold;
+        }
+
+        .counter-label {
+            font-size: 12px;
+            opacity: 0.9;
+            margin-top: 5px;
+        }
+
+        .debug-info {
+            margin-top: 15px;
+            padding: 10px;
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 4px;
+            font-size: 11px;
+            color: #856404;
+        }
+
+        .debug-info strong {
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        /* Content Area */
+        .content {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            margin-top: 10px;
+            /* Menurunkan content */
+        }
+
+        .camera-section {
+            margin-bottom: 20px;
+        }
+
+        .camera-box {
+            position: relative;
+            width: 100%;
+            height: 500px;
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        #video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            z-index: 5;
+        }
+
+        .overlay.hidden {
+            display: none;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #fff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 15px;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .overlay-text {
+            font-size: 16px;
+            text-align: center;
+            line-height: 1.5;
+        }
+
+        /* Log Section */
+        .log-section {
+            background: #fff;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .log-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .log-header h2 {
+            font-size: 18px;
+            color: #333;
+        }
+
+        .log-count {
+            background: #2196f3;
+            color: white;
+            padding: 5px 12px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .log-list {
+            max-height: 250px;
+            overflow-y: auto;
+        }
+
+        .log-item {
+            padding: 12px;
+            margin-bottom: 8px;
+            background: #f9f9f9;
+            border-left: 3px solid #2196f3;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+
+        .log-item .time {
+            color: #999;
+            font-size: 11px;
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .log-item .items {
+            color: #333;
+            font-weight: 500;
+        }
+
+        .empty {
+            text-align: center;
+            color: #999;
+            padding: 30px;
+            font-size: 14px;
+        }
+
+        .info-bar {
+            margin-top: 15px;
+            padding: 12px 15px;
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #1565c0;
+        }
+
+        .detection-status {
+            margin-top: 10px;
+            padding: 8px 12px;
+            background: #e8f5e9;
+            border-radius: 4px;
+            font-size: 12px;
+            color: #2e7d32;
+            text-align: center;
+        }
+
+        .detection-status.error {
+            background: #ffebee;
+            color: #c62828;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Header -->
+    <div class="header">
+        <div class="header-left">
+            <h1>Edge AI Inventory Scanner</h1>
+        </div>
+        <div class="header-right">
+            <div class="logo">
+                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path
+                        d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z" />
+                </svg>
+            </div>
+            <div class="app-name">v1.0</div>
+        </div>
+    </div>
+
+    <!-- Main Container -->
+    <div class="main-container">
+
+        <!-- Sidebar Kiri -->
+        <div class="sidebar">
+            <h3>Kontrol Kamera</h3>
+            <button class="btn-start" id="btnStart" onclick="startCamera()">▶ Start Camera</button>
+            <button class="btn-stop" id="btnStop" onclick="stopCamera()" disabled> Stop Camera</button>
+
+            <h3 style="margin-top: 20px;">AI Detection</h3>
+            <button class="btn-ai" id="btnAI" onclick="toggleAI()" disabled>🎯 Start AI</button>
+            <button class="btn-export" id="btnExport" onclick="exportCSV()" disabled>📥 Export CSV</button>
+
+            <!-- Counter -->
+            <div class="counter-box">
+                <h3>Orang Terdeteksi</h3>
+                <div class="counter-value" id="personCount">0</div>
+                <div class="counter-label">orang</div>
+            </div>
+
+            <!-- Debug Info -->
+            <div class="debug-info">
+                <strong>Debug Info:</strong>
+                <div id="debug-text">Kamera: Off | AI: Off</div>
+            </div>
+        </div>
+
+        <!-- Content Area -->
+        <div class="content">
+
+            <!-- Camera Section -->
+            <div class="camera-section">
+                <div class="camera-box">
+                    <video id="video" autoplay playsinline muted></video>
+                    <canvas id="canvas"></canvas>
+                    <div class="overlay" id="overlay-msg">
+                        <div class="spinner"></div>
+                        <div class="overlay-text" id="overlay-text">Klik "Start Camera" untuk memulai</div>
+                    </div>
+                </div>
+                <div id="detection-status" class="detection-status" style="display:none;"></div>
+            </div>
+
+            <!-- Log Section -->
+            <div class="log-section">
+                <div class="log-header">
+                    <h2>Log Deteksi Objek</h2>
+                    <span class="log-count" id="log-count">0 items</span>
+                </div>
+                <div class="log-list" id="data-list">
+                    <div class="empty">Belum ada objek terdeteksi</div>
+                </div>
+            </div>
+
+            <!-- Info Bar -->
+            <div class="info-bar">
+                <strong>💡 Tips:</strong> Pastikan ruangan terang, taruh 3-5 objek berbeda (laptop, HP, buku, keyboard,
+                mouse) di depan kamera. Jarak ideal 30-100cm dari kamera.
+            </div>
+
+        </div>
+
+    </div>
+
+    <script>
+        class MockFirestore {
+            constructor() {
+                this.data = JSON.parse(localStorage.getItem('mock_inventory_db')) || [];
+                this.listeners = [];
+            }
+            collection() { return this; }
+            async add(payload) {
+                const doc = {
+                    ...payload,
+                    id: Date.now().toString(),
+                    timestamp: new Date().toISOString()
+                };
+                this.data.unshift(doc);
+                if (this.data.length > 50) this.data.pop();
+                localStorage.setItem('mock_inventory_db', JSON.stringify(this.data));
+                this.listeners.forEach(cb => cb(this.data));
+                return Promise.resolve();
+            }
+            orderBy() { return this; }
+            limit() { return this; }
+            onSnapshot(cb) {
+                this.listeners.push(cb);
+                cb(this.data);
+                return () => { };
+            }
+        }
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyB805SFGmNPO06PPXt48deyESMEpFdFzzA",
+            authDomain: "expense-tracker-mahasiswa28.firebaseapp.com",
+            projectId: "expense-tracker-mahasiswa28",
+            storageBucket: "expense-tracker-mahasiswa28.firebasestorage.app",
+            messagingSenderId: "821191587040",
+            appId: "1:821191587040:web:5db1024e32adfea09e0c85"
+        };
+
+        let db;
+        let isMockMode = true;
+
+        if (firebaseConfig.apiKey && firebaseConfig.projectId && firebaseConfig.apiKey !== "PASTE_API_KEY_ANDA_DI_SINI") {
+            if (typeof firebase !== 'undefined') {
+                try {
+                    firebase.initializeApp(firebaseConfig);
+                    db = firebase.firestore();
+                    isMockMode = false;
+                } catch (e) {
+                    console.error("Firebase init error", e);
+                }
+            }
+        }
+
+        if (isMockMode) {
+            db = new MockFirestore();
+        }
+
+        let currentStream = null;
+        let model = null;
+        let isAIDetecting = false;
+        let isCameraOn = false;
+        let lastSaveTime = 0;
+        const SAVE_THROTTLE_MS = 3000;
+        let allDetections = [];
+        let detectionCount = 0;
+
+        const videoEl = document.getElementById('video');
+        const canvasEl = document.getElementById('canvas');
+        const ctx = canvasEl.getContext('2d');
+        const overlayMsg = document.getElementById('overlay-msg');
+        const overlayText = document.getElementById('overlay-text');
+        const btnStart = document.getElementById('btnStart');
+        const btnStop = document.getElementById('btnStop');
+        const btnAI = document.getElementById('btnAI');
+        const btnExport = document.getElementById('btnExport');
+        const personCountEl = document.getElementById('personCount');
+        const debugText = document.getElementById('debug-text');
+        const detectionStatusEl = document.getElementById('detection-status');
+
+        const TARGET_CLASSES = [
+            'person', 'laptop', 'phone', 'book', 'keyboard', 'mouse',
+            'scissors', 'chair', 'couch', 'tv', 'dining table', 'cup',
+            'bottle', 'backpack', 'handbag', 'remote', 'clock', 'vase',
+            'potted plant', 'teddy bear', 'pizza', 'cake', 'donut',
+            'car', 'motorcycle', 'bicycle', 'dog', 'cat', 'bird'
+        ];
+
+        const CONFIDENCE_THRESHOLD = 0.40;
+
+        function updateDebugInfo() {
+            const cameraStatus = isCameraOn ? 'On' : 'Off';
+            const aiStatus = isAIDetecting ? 'On' : 'Off';
+            const modelStatus = model ? 'Loaded' : 'Not Loaded';
+            debugText.textContent = `Kamera: ${cameraStatus} | AI: ${aiStatus} | Model: ${modelStatus}`;
+        }
+
+        function showDetectionStatus(message, isError = false) {
+            detectionStatusEl.textContent = message;
+            detectionStatusEl.style.display = 'block';
+            if (isError) {
+                detectionStatusEl.className = 'detection-status error';
+            } else {
+                detectionStatusEl.className = 'detection-status';
+            }
+            setTimeout(() => {
+                detectionStatusEl.style.display = 'none';
+            }, 3000);
+        }
+
+        function showOverlay(title, subtitle) {
+            overlayText.innerHTML = `<strong>${title}</strong><br><br>${subtitle}`;
+            overlayMsg.classList.remove('hidden');
+        }
+
+        function hideOverlay() {
+            overlayMsg.classList.add('hidden');
+        }
+
+        async function saveToDatabase(data) {
+            try {
+                const itemsString = data.map(d =>
+                    `${d.class} (${d.confidence}%)`
+                ).join(', ');
+
+                const payload = {
+                    items: itemsString,
+                    count: data.length,
+                    deviceId: 'BROWSER-TEST',
+                    timestamp: isMockMode
+                        ? new Date().toISOString()
+                        : (typeof firebase !== 'undefined' ? firebase.firestore.FieldValue.serverTimestamp() : new Date().toISOString())
+                };
+
+                await db.collection('detections').add(payload);
+                console.log("✅ Data tersimpan:", payload);
+            } catch (err) {
+                console.error("❌ Gagal menyimpan ke database:", err);
+            }
+        }
+
+        function listenToDatabase() {
+            const collectionRef = db.collection('detections')
+                .orderBy('timestamp', 'desc')
+                .limit(30);
+
+            collectionRef.onSnapshot(snapshot => {
+                const dataList = document.getElementById('data-list');
+                dataList.innerHTML = '';
+
+                let count = 0;
+                const docs = isMockMode ? snapshot : snapshot.docs;
+
+                docs.forEach(doc => {
+                    count++;
+                    const data = isMockMode ? doc : doc.data();
+
+                    let timeStr;
+                    if (data.timestamp) {
+                        const date = isMockMode
+                            ? new Date(data.timestamp)
+                            : data.timestamp.toDate();
+                        timeStr = date.toLocaleTimeString('id-ID');
+                    } else {
+                        timeStr = 'Baru saja';
+                    }
+
+                    const div = document.createElement('div');
+                    div.className = 'log-item';
+                    div.innerHTML = `
+                        <span class="time">${timeStr}</span>
+                        <span class="items">${data.items}</span>
+                    `;
+                    dataList.appendChild(div);
+                });
+
+                document.getElementById('log-count').textContent = `${count} items`;
+
+                if (count === 0) {
+                    dataList.innerHTML = '<div class="empty">Belum ada objek terdeteksi</div>';
+                }
+            });
+        }
+
+        async function loadModel() {
+            showOverlay("Memuat Model AI", "Mengunduh model COCO-SSD (~5MB)... Mohon tunggu.");
+
+            try {
+                console.log("🔄 Memulai load model COCO-SSD...");
+                model = await cocoSsd.load({ base: 'mobilenet_v2' });
+
+                hideOverlay();
+                console.log("✅ Model berhasil dimuat!");
+
+                if (isCameraOn) {
+                    btnAI.disabled = false;
+                }
+
+                updateDebugInfo();
+
+            } catch (err) {
+                console.error("❌ Gagal memuat model:", err);
+                showOverlay("Gagal Memuat Model", "Periksa koneksi internet Anda.<br>Error: " + err.message);
+            }
+        }
+
+        async function detectFrame() {
+            if (!model || !isCameraOn) return;
+
+            try {
+                const predictions = await model.detect(videoEl);
+                ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+
+                let detectedTargets = [];
+
+                predictions.forEach(pred => {
+                    const [x, y, w, h] = pred.bbox;
+                    const isTarget = TARGET_CLASSES.includes(pred.class);
+                    const confidence = pred.score;
+
+                    ctx.strokeStyle = isTarget ? '#00ff00' : '#ff6600';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(x, y, w, h);
+
+                    if (isTarget && confidence > CONFIDENCE_THRESHOLD) {
+                        detectedTargets.push({
+                            class: pred.class,
+                            confidence: parseFloat((confidence * 100).toFixed(2))
+                        });
+
+                        const label = `${pred.class} ${(confidence * 100).toFixed(0)}%`;
+                        ctx.fillStyle = confidence > 0.7 ? '#00ff00' : '#ff9800';
+                        const textWidth = ctx.measureText(label).width;
+                        ctx.fillRect(x, y - 20, textWidth + 8, 20);
+
+                        ctx.fillStyle = '#000';
+                        ctx.font = 'bold 12px Arial';
+                        ctx.fillText(label, x + 4, y - 5);
+                    }
+                });
+
+                const personCount = detectedTargets.filter(d => d.class === 'person').length;
+                personCountEl.textContent = personCount;
+
+                if (detectedTargets.length > 0) {
+                    detectionCount++;
+                    showDetectionStatus(`✅ Terdeteksi ${detectedTargets.length} objek`);
+
+                    if (Date.now() - lastSaveTime > SAVE_THROTTLE_MS) {
+                        saveToDatabase(detectedTargets);
+                        allDetections.push({
+                            timestamp: new Date().toISOString(),
+                            items: detectedTargets.map(d => `${d.class} (${d.confidence}%)`).join(', '),
+                            count: detectedTargets.length
+                        });
+                        lastSaveTime = Date.now();
+                        btnExport.disabled = false;
+                    }
+                }
+
+            } catch (err) {
+                console.error("❌ Error saat detect:", err);
+            }
+        }
+
+        async function detectLoop() {
+            if (!isAIDetecting || !isCameraOn) return;
+            await detectFrame();
+            requestAnimationFrame(detectLoop);
+        }
+
+        function toggleAI() {
+            if (!isAIDetecting) {
+                isAIDetecting = true;
+                btnAI.textContent = "⏹ Stop AI";
+                btnAI.className = "btn-ai btn-stop";
+                detectLoop();
+            } else {
+                isAIDetecting = false;
+                btnAI.textContent = "🎯 Start AI";
+                btnAI.className = "btn-ai";
+                ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+                personCountEl.textContent = "0";
+                detectionCount = 0;
+            }
+            updateDebugInfo();
+        }
+
+        async function startCamera() {
+            try {
+                overlayText.textContent = "Memulai kamera...";
+                overlayMsg.classList.remove('hidden');
+
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: 'environment',
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    },
+                    audio: false
+                });
+
+                currentStream = stream;
+                videoEl.srcObject = stream;
+                isCameraOn = true;
+
+                await new Promise(resolve => {
+                    videoEl.onloadedmetadata = () => {
+                        canvasEl.width = videoEl.videoWidth;
+                        canvasEl.height = videoEl.videoHeight;
+                        resolve();
+                    };
+                });
+
+                overlayMsg.classList.add('hidden');
+                btnStart.disabled = true;
+                btnStop.disabled = false;
+
+                if (model) {
+                    btnAI.disabled = false;
+                }
+
+                updateDebugInfo();
+
+            } catch (err) {
+                console.error("❌ Gagal akses kamera:", err);
+                overlayText.textContent = "Gagal akses kamera!";
+                alert("Akses kamera ditolak. Pastikan via http:// bukan file://");
+                btnStart.disabled = false;
+                btnStop.disabled = true;
+            }
+        }
+
+        function stopCamera() {
+            if (isAIDetecting) {
+                isAIDetecting = false;
+                btnAI.textContent = "🎯 Start AI";
+                btnAI.className = "btn-ai";
+                btnAI.disabled = true;
+            }
+
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+                currentStream = null;
+                videoEl.srcObject = null;
+                isCameraOn = false;
+
+                ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+                personCountEl.textContent = "0";
+                detectionCount = 0;
+
+                overlayText.textContent = "Kamera dimatikan";
+                overlayMsg.classList.remove('hidden');
+
+                btnStart.disabled = false;
+                btnStop.disabled = true;
+
+                updateDebugInfo();
+            }
+        }
+
+        function exportCSV() {
+            if (allDetections.length === 0) {
+                alert("Tidak ada data untuk diekspor!");
+                return;
+            }
+
+            let csv = 'Timestamp,Items,Count\n';
+
+            allDetections.forEach(det => {
+                csv += `"${det.timestamp}","${det.items}",${det.count}\n`;
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', `deteksi_log_${new Date().toISOString().slice(0, 10)}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            alert(`✅ Exported ${allDetections.length} records!`);
+        }
+
+        function initApp() {
+            listenToDatabase();
+            loadModel();
+            updateDebugInfo();
+        }
+
+        document.addEventListener('DOMContentLoaded', initApp);
+    </script>
+
+</body>
+
+</html>
