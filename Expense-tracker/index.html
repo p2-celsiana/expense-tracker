@@ -6,8 +6,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Edge AI Inventory Scanner</title>
 
+    <!-- Import TensorFlow.js dan COCO-SSD -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
+
+    <!-- ✅ TAMBAHKAN INI: Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 
     <style>
         * {
@@ -23,7 +28,6 @@
             min-height: 100vh;
         }
 
-        /* Header */
         .header {
             background: #fff;
             border-bottom: 1px solid #ddd;
@@ -69,15 +73,12 @@
             color: #333;
         }
 
-        /* Main Layout */
         .main-container {
             display: flex;
             height: calc(100vh - 71px);
             padding-top: 15px;
-            /* Menurunkan layout ke bawah */
         }
 
-        /* Sidebar Kiri */
         .sidebar {
             width: 260px;
             background: #fff;
@@ -85,7 +86,6 @@
             padding: 20px;
             overflow-y: auto;
             margin-top: 10px;
-            /* Menurunkan sidebar */
             border-radius: 8px;
             margin-left: 10px;
             height: calc(100% - 20px);
@@ -122,10 +122,6 @@
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
         }
 
-        .sidebar button:active:not(:disabled) {
-            transform: translateY(0);
-        }
-
         .sidebar button:disabled {
             opacity: 0.4;
             cursor: not-allowed;
@@ -147,8 +143,51 @@
             background: #ff9800;
         }
 
+        /* Status Bar - Tambah untuk debug Firebase */
+        .status-bar {
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 6px;
+            border: 1px solid #ddd;
+        }
+
+        .status-bar .status-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 5px 0;
+            font-size: 12px;
+        }
+
+        .status-bar .status-row span:first-child {
+            color: #666;
+        }
+
+        .badge {
+            padding: 3px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .badge-online {
+            background: #4caf50;
+            color: white;
+        }
+
+        .badge-demo {
+            background: #ff9800;
+            color: white;
+        }
+
+        .badge-error {
+            background: #f44336;
+            color: white;
+        }
+
         .counter-box {
-            margin-top: 25px;
+            margin-top: 20px;
             padding: 15px;
             background: linear-gradient(135deg, #2196f3, #1976d2);
             border-radius: 6px;
@@ -189,13 +228,11 @@
             margin-bottom: 5px;
         }
 
-        /* Content Area */
         .content {
             flex: 1;
             padding: 20px;
             overflow-y: auto;
             margin-top: 10px;
-            /* Menurunkan content */
         }
 
         .camera-section {
@@ -271,7 +308,6 @@
             line-height: 1.5;
         }
 
-        /* Log Section */
         .log-section {
             background: #fff;
             border-radius: 8px;
@@ -364,7 +400,6 @@
 
 <body>
 
-    <!-- Header -->
     <div class="header">
         <div class="header-left">
             <h1>Edge AI Inventory Scanner</h1>
@@ -380,37 +415,42 @@
         </div>
     </div>
 
-    <!-- Main Container -->
     <div class="main-container">
 
-        <!-- Sidebar Kiri -->
         <div class="sidebar">
             <h3>Kontrol Kamera</h3>
             <button class="btn-start" id="btnStart" onclick="startCamera()">▶ Start Camera</button>
-            <button class="btn-stop" id="btnStop" onclick="stopCamera()" disabled> Stop Camera</button>
+            <button class="btn-stop" id="btnStop" onclick="stopCamera()" disabled>⏹ Stop Camera</button>
 
             <h3 style="margin-top: 20px;">AI Detection</h3>
             <button class="btn-ai" id="btnAI" onclick="toggleAI()" disabled>🎯 Start AI</button>
-            <button class="btn-export" id="btnExport" onclick="exportCSV()" disabled>📥 Export CSV</button>
+            <button class="btn-export" id="btnExport" onclick="exportCSV()" disabled> Export CSV</button>
 
-            <!-- Counter -->
+            <!-- Status Bar untuk Debug Firebase -->
+            <div class="status-bar">
+                <div class="status-row">
+                    <span>Database:</span>
+                    <span id="db-status" class="badge badge-demo">DEMO</span>
+                </div>
+                <div class="status-row">
+                    <span>Model AI:</span>
+                    <span id="model-status" class="badge badge-demo">Loading</span>
+                </div>
+            </div>
+
             <div class="counter-box">
                 <h3>Orang Terdeteksi</h3>
                 <div class="counter-value" id="personCount">0</div>
                 <div class="counter-label">orang</div>
             </div>
 
-            <!-- Debug Info -->
             <div class="debug-info">
                 <strong>Debug Info:</strong>
                 <div id="debug-text">Kamera: Off | AI: Off</div>
             </div>
         </div>
 
-        <!-- Content Area -->
         <div class="content">
-
-            <!-- Camera Section -->
             <div class="camera-section">
                 <div class="camera-box">
                     <video id="video" autoplay playsinline muted></video>
@@ -423,7 +463,6 @@
                 <div id="detection-status" class="detection-status" style="display:none;"></div>
             </div>
 
-            <!-- Log Section -->
             <div class="log-section">
                 <div class="log-header">
                     <h2>Log Deteksi Objek</h2>
@@ -434,17 +473,53 @@
                 </div>
             </div>
 
-            <!-- Info Bar -->
             <div class="info-bar">
-                <strong>💡 Tips:</strong> Pastikan ruangan terang, taruh 3-5 objek berbeda (laptop, HP, buku, keyboard,
-                mouse) di depan kamera. Jarak ideal 30-100cm dari kamera.
+                <strong>💡 Tips:</strong> Pastikan ruangan terang, taruh 3-5 objek berbeda di depan kamera. Jarak ideal
+                30-100cm.
             </div>
-
         </div>
 
     </div>
 
     <script>
+        // =============================================
+        // FIREBASE CONFIG
+        // =============================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyB805SFGmNPO06PPXt48deyESMEpFdFzzA",
+            authDomain: "expense-tracker-mahasiswa28.firebaseapp.com",
+            projectId: "expense-tracker-mahasiswa28",
+            storageBucket: "expense-tracker-mahasiswa28.firebasestorage.app",
+            messagingSenderId: "821191587040",
+            appId: "1:821191587040:web:5db1024e32adfea09e0c85"
+        };
+
+        let db;
+        let isMockMode = true;
+        const dbStatusEl = document.getElementById('db-status');
+
+        // Cek apakah Firebase SDK sudah di-load
+        if (typeof firebase !== 'undefined') {
+            try {
+                firebase.initializeApp(firebaseConfig);
+                db = firebase.firestore();
+                isMockMode = false;
+                dbStatusEl.textContent = "FIREBASE ONLINE";
+                dbStatusEl.className = "badge badge-online";
+                console.log("✅ Firebase berhasil diinisialisasi");
+                console.log("Project ID:", firebaseConfig.projectId);
+            } catch (e) {
+                console.error("❌ Firebase init error:", e);
+                dbStatusEl.textContent = "ERROR";
+                dbStatusEl.className = "badge badge-error";
+            }
+        } else {
+            console.warn("️ Firebase SDK tidak tersedia. Menggunakan Mock Database.");
+        }
+
+        // =============================================
+        // MOCK FIRESTORE (Fallback)
+        // =============================================
         class MockFirestore {
             constructor() {
                 this.data = JSON.parse(localStorage.getItem('mock_inventory_db')) || [];
@@ -472,34 +547,14 @@
             }
         }
 
-        const firebaseConfig = {
-            apiKey: "AIzaSyB805SFGmNPO06PPXt48deyESMEpFdFzzA",
-            authDomain: "expense-tracker-mahasiswa28.firebaseapp.com",
-            projectId: "expense-tracker-mahasiswa28",
-            storageBucket: "expense-tracker-mahasiswa28.firebasestorage.app",
-            messagingSenderId: "821191587040",
-            appId: "1:821191587040:web:5db1024e32adfea09e0c85"
-        };
-
-        let db;
-        let isMockMode = true;
-
-        if (firebaseConfig.apiKey && firebaseConfig.projectId && firebaseConfig.apiKey !== "PASTE_API_KEY_ANDA_DI_SINI") {
-            if (typeof firebase !== 'undefined') {
-                try {
-                    firebase.initializeApp(firebaseConfig);
-                    db = firebase.firestore();
-                    isMockMode = false;
-                } catch (e) {
-                    console.error("Firebase init error", e);
-                }
-            }
-        }
-
         if (isMockMode) {
             db = new MockFirestore();
+            console.log("✅ Mock Database aktif (localStorage)");
         }
 
+        // =============================================
+        // VARIABEL GLOBAL
+        // =============================================
         let currentStream = null;
         let model = null;
         let isAIDetecting = false;
@@ -507,7 +562,6 @@
         let lastSaveTime = 0;
         const SAVE_THROTTLE_MS = 3000;
         let allDetections = [];
-        let detectionCount = 0;
 
         const videoEl = document.getElementById('video');
         const canvasEl = document.getElementById('canvas');
@@ -518,12 +572,13 @@
         const btnStop = document.getElementById('btnStop');
         const btnAI = document.getElementById('btnAI');
         const btnExport = document.getElementById('btnExport');
+        const modelStatusEl = document.getElementById('model-status');
         const personCountEl = document.getElementById('personCount');
         const debugText = document.getElementById('debug-text');
         const detectionStatusEl = document.getElementById('detection-status');
 
         const TARGET_CLASSES = [
-            'person', 'laptop', 'phone', 'book', 'keyboard', 'mouse',
+            'person', 'laptop', 'cell phone', 'book', 'keyboard', 'mouse',
             'scissors', 'chair', 'couch', 'tv', 'dining table', 'cup',
             'bottle', 'backpack', 'handbag', 'remote', 'clock', 'vase',
             'potted plant', 'teddy bear', 'pizza', 'cake', 'donut',
@@ -536,20 +591,15 @@
             const cameraStatus = isCameraOn ? 'On' : 'Off';
             const aiStatus = isAIDetecting ? 'On' : 'Off';
             const modelStatus = model ? 'Loaded' : 'Not Loaded';
-            debugText.textContent = `Kamera: ${cameraStatus} | AI: ${aiStatus} | Model: ${modelStatus}`;
+            const dbMode = isMockMode ? 'Mock' : 'Firebase';
+            debugText.textContent = `Kamera: ${cameraStatus} | AI: ${aiStatus} | Model: ${modelStatus} | DB: ${dbMode}`;
         }
 
         function showDetectionStatus(message, isError = false) {
             detectionStatusEl.textContent = message;
             detectionStatusEl.style.display = 'block';
-            if (isError) {
-                detectionStatusEl.className = 'detection-status error';
-            } else {
-                detectionStatusEl.className = 'detection-status';
-            }
-            setTimeout(() => {
-                detectionStatusEl.style.display = 'none';
-            }, 3000);
+            detectionStatusEl.className = isError ? 'detection-status error' : 'detection-status';
+            setTimeout(() => { detectionStatusEl.style.display = 'none'; }, 3000);
         }
 
         function showOverlay(title, subtitle) {
@@ -557,15 +607,14 @@
             overlayMsg.classList.remove('hidden');
         }
 
-        function hideOverlay() {
-            overlayMsg.classList.add('hidden');
-        }
+        function hideOverlay() { overlayMsg.classList.add('hidden'); }
 
+        // =============================================
+        // SAVE TO DATABASE (Firebase ATAU Mock)
+        // =============================================
         async function saveToDatabase(data) {
             try {
-                const itemsString = data.map(d =>
-                    `${d.class} (${d.confidence}%)`
-                ).join(', ');
+                const itemsString = data.map(d => `${d.class} (${d.confidence}%)`).join(', ');
 
                 const payload = {
                     items: itemsString,
@@ -573,17 +622,28 @@
                     deviceId: 'BROWSER-TEST',
                     timestamp: isMockMode
                         ? new Date().toISOString()
-                        : (typeof firebase !== 'undefined' ? firebase.firestore.FieldValue.serverTimestamp() : new Date().toISOString())
+                        : firebase.firestore.FieldValue.serverTimestamp()
                 };
 
+                console.log("💾 Menyimpan ke database...", isMockMode ? "(Mock)" : "(Firebase)");
+                console.log("Payload:", payload);
+
                 await db.collection('detections').add(payload);
-                console.log("✅ Data tersimpan:", payload);
+
+                console.log("✅ Data berhasil disimpan!");
+                showDetectionStatus(`💾 Tersimpan: ${data.length} objek`);
             } catch (err) {
                 console.error("❌ Gagal menyimpan ke database:", err);
+                showDetectionStatus(" Gagal simpan: " + err.message, true);
             }
         }
 
+        // =============================================
+        // LISTEN TO DATABASE (Real-time)
+        // =============================================
         function listenToDatabase() {
+            console.log(" Mulai mendengarkan database...");
+
             const collectionRef = db.collection('detections')
                 .orderBy('timestamp', 'desc')
                 .limit(30);
@@ -593,6 +653,8 @@
                 dataList.innerHTML = '';
 
                 let count = 0;
+
+                // Handle perbedaan struktur Firestore vs Mock
                 const docs = isMockMode ? snapshot : snapshot.docs;
 
                 docs.forEach(doc => {
@@ -623,9 +685,17 @@
                 if (count === 0) {
                     dataList.innerHTML = '<div class="empty">Belum ada objek terdeteksi</div>';
                 }
+
+                console.log(` Log terupdate: ${count} items`);
+            }, error => {
+                console.error(" Error listenToDatabase:", error);
+                showDetectionStatus("Error database: " + error.message, true);
             });
         }
 
+        // =============================================
+        // LOAD MODEL AI
+        // =============================================
         async function loadModel() {
             showOverlay("Memuat Model AI", "Mengunduh model COCO-SSD (~5MB)... Mohon tunggu.");
 
@@ -634,20 +704,24 @@
                 model = await cocoSsd.load({ base: 'mobilenet_v2' });
 
                 hideOverlay();
+                modelStatusEl.textContent = "Siap";
+                modelStatusEl.className = "badge badge-online";
                 console.log("✅ Model berhasil dimuat!");
 
-                if (isCameraOn) {
-                    btnAI.disabled = false;
-                }
-
+                if (isCameraOn) btnAI.disabled = false;
                 updateDebugInfo();
 
             } catch (err) {
                 console.error("❌ Gagal memuat model:", err);
                 showOverlay("Gagal Memuat Model", "Periksa koneksi internet Anda.<br>Error: " + err.message);
+                modelStatusEl.textContent = "Gagal";
+                modelStatusEl.className = "badge badge-error";
             }
         }
 
+        // =============================================
+        // DETECT FRAME
+        // =============================================
         async function detectFrame() {
             if (!model || !isCameraOn) return;
 
@@ -687,9 +761,6 @@
                 personCountEl.textContent = personCount;
 
                 if (detectedTargets.length > 0) {
-                    detectionCount++;
-                    showDetectionStatus(`✅ Terdeteksi ${detectedTargets.length} objek`);
-
                     if (Date.now() - lastSaveTime > SAVE_THROTTLE_MS) {
                         saveToDatabase(detectedTargets);
                         allDetections.push({
@@ -725,7 +796,6 @@
                 btnAI.className = "btn-ai";
                 ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
                 personCountEl.textContent = "0";
-                detectionCount = 0;
             }
             updateDebugInfo();
         }
@@ -736,11 +806,7 @@
                 overlayMsg.classList.remove('hidden');
 
                 const stream = await navigator.mediaDevices.getUserMedia({
-                    video: {
-                        facingMode: 'environment',
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 }
-                    },
+                    video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
                     audio: false
                 });
 
@@ -760,10 +826,7 @@
                 btnStart.disabled = true;
                 btnStop.disabled = false;
 
-                if (model) {
-                    btnAI.disabled = false;
-                }
-
+                if (model) btnAI.disabled = false;
                 updateDebugInfo();
 
             } catch (err) {
@@ -791,14 +854,12 @@
 
                 ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
                 personCountEl.textContent = "0";
-                detectionCount = 0;
 
                 overlayText.textContent = "Kamera dimatikan";
                 overlayMsg.classList.remove('hidden');
 
                 btnStart.disabled = false;
                 btnStop.disabled = true;
-
                 updateDebugInfo();
             }
         }
@@ -810,15 +871,13 @@
             }
 
             let csv = 'Timestamp,Items,Count\n';
-
             allDetections.forEach(det => {
                 csv += `"${det.timestamp}","${det.items}",${det.count}\n`;
             });
 
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement('a');
-            const url = URL.createObjectURL(blob);
-            link.setAttribute('href', url);
+            link.setAttribute('href', URL.createObjectURL(blob));
             link.setAttribute('download', `deteksi_log_${new Date().toISOString().slice(0, 10)}.csv`);
             link.style.visibility = 'hidden';
             document.body.appendChild(link);
@@ -829,6 +888,8 @@
         }
 
         function initApp() {
+            console.log(" Initializing app...");
+            console.log("Firebase SDK tersedia:", typeof firebase !== 'undefined');
             listenToDatabase();
             loadModel();
             updateDebugInfo();
